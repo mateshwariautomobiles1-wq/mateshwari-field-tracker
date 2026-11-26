@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Field Tracker — Admin</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- LOGIN -->
+  <section id="loginScreen" class="login hidden">
+    <form id="loginForm" class="card login-card">
+      <h1>📍 Field Tracker</h1>
+      <p class="muted">Admin login</p>
+      <input id="loginEmail" type="email" placeholder="Admin email" required />
+      <input id="loginPass" type="password" placeholder="Password" required />
+      <button type="submit" class="btn primary">Login</button>
+      <p id="loginErr" class="err"></p>
+    </form>
+  </section>
+
+  <!-- MAIN -->
+  <section id="mainScreen" class="main hidden">
+    <aside class="sidebar">
+      <header class="side-head">
+        <div>
+          <h2>📍 Field Tracker</h2>
+          <p class="muted small" id="summary">—</p>
+        </div>
+        <button id="logoutBtn" class="btn ghost small" title="Logout">Logout</button>
+      </header>
+
+      <div class="side-actions">
+        <input id="search" type="search" placeholder="Naam ya mobile se dhoondhein…" />
+        <button id="addBtn" class="btn primary">+ Employee</button>
+      </div>
+
+      <!-- List view -->
+      <div id="listView">
+        <button id="showAllBtn" class="btn ghost full small">🗺️ Sab employees ki live location</button>
+        <ul id="empList" class="emp-list"></ul>
+      </div>
+
+      <!-- Detail view -->
+      <div id="detailView" class="hidden">
+        <button id="backBtn" class="btn ghost small">← Sab employees</button>
+        <div class="card detail-card">
+          <div class="row-between">
+            <div>
+              <h3 id="dName"></h3>
+              <p class="muted small" id="dMobile"></p>
+            </div>
+            <span id="dBadge" class="badge"></span>
+          </div>
+          <p class="small" id="dLive"></p>
+          <div class="btn-row">
+            <button id="editBtn" class="btn ghost small">✏️ Naam</button>
+            <button id="pinBtn" class="btn ghost small">🔑 PIN</button>
+            <button id="toggleBtn" class="btn ghost small"></button>
+            <button id="shareBtn" class="btn ghost small">📤 Share</button>
+            <button id="delBtn" class="btn danger small">🗑️</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row-between">
+            <strong>Din bhar ka route</strong>
+            <input id="dDate" type="date" />
+          </div>
+          <div id="dayStats" class="stats"></div>
+          <div class="btn-row">
+            <button id="liveBtn" class="btn ghost small">📍 Live location</button>
+            <button id="csvBtn" class="btn ghost small">⬇️ CSV</button>
+          </div>
+          <ol id="timeline" class="timeline"></ol>
+        </div>
+      </div>
+    </aside>
+
+    <div id="map"></div>
+  </section>
+
+  <!-- MODAL -->
+  <div id="modal" class="modal hidden">
+    <div class="card modal-card">
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

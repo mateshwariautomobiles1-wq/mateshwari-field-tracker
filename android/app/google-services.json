@@ -1,0 +1,19 @@
+{
+  "project_info": {
+    "project_number": "154160008325",
+    "project_id": "mateshwari-field-tracker",
+    "storage_bucket": "mateshwari-field-tracker.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:154160008325:android:578d19bec8501655b86dec",
+        "android_client_info": { "package_name": "com.fieldtrack.app" }
+      },
+      "oauth_client": [],
+      "api_key": [ { "current_key": "AIzaSyBmngTCftNu9tyiJfgNtdxudt4_NG7qUK4" } ],
+      "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+    }
+  ],
+  "configuration_version": "1"
+}
