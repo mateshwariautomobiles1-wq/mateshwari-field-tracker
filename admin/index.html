@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -32,19 +32,19 @@
       </header>
 
       <div class="side-actions">
-        <input id="search" type="search" placeholder="Naam ya mobile se dhoondhein…" />
+        <input id="search" type="search" placeholder="Search by name or mobile…" />
         <button id="addBtn" class="btn primary">+ Employee</button>
       </div>
 
       <!-- List view -->
       <div id="listView">
-        <button id="showAllBtn" class="btn ghost full small">🗺️ Sab employees ki live location</button>
+        <button id="showAllBtn" class="btn ghost full small">🗺️ All employees live</button>
         <ul id="empList" class="emp-list"></ul>
       </div>
 
       <!-- Detail view -->
       <div id="detailView" class="hidden">
-        <button id="backBtn" class="btn ghost small">← Sab employees</button>
+        <button id="backBtn" class="btn ghost small">← All employees</button>
         <div class="card detail-card">
           <div class="row-between">
             <div>
@@ -55,7 +55,7 @@
           </div>
           <p class="small" id="dLive"></p>
           <div class="btn-row">
-            <button id="editBtn" class="btn ghost small">✏️ Naam</button>
+            <button id="editBtn" class="btn ghost small">✏️ Name</button>
             <button id="pinBtn" class="btn ghost small">🔑 PIN</button>
             <button id="toggleBtn" class="btn ghost small"></button>
             <button id="shareBtn" class="btn ghost small">📤 Share</button>
@@ -65,7 +65,7 @@
 
         <div class="card">
           <div class="row-between">
-            <strong>Din bhar ka route</strong>
+            <strong>Day's route</strong>
             <input id="dDate" type="date" />
           </div>
           <div id="dayStats" class="stats"></div>

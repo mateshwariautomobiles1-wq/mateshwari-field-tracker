@@ -45,27 +45,31 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnNotif: Button
     private lateinit var btnBattery: Button
     private lateinit var btnGps: Button
+    private lateinit var btnAdmin: Button
 
     private val fineLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-            if (!Perms.hasFine(this)) openAppSettings("Location > Allow (Precise ON) chunein")
+            if (!Perms.hasFine(this)) openAppSettings("Location > Allow (choose Precise)")
             refresh()
         }
 
     private val bgLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            if (!Perms.hasBackground(this)) openAppSettings("Location > \"Allow all the time\" chunein")
+            if (!Perms.hasBackground(this)) openAppSettings("Location > choose \"Allow all the time\"")
             refresh()
         }
 
     private val notifLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) {
-            if (!Perms.hasNotif(this)) openAppSettings("Notifications ON karein")
+            if (!Perms.hasNotif(this)) openAppSettings("Turn Notifications on")
             refresh()
         }
 
     private val gpsLauncher =
         registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { refresh() }
+
+    private val adminLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { refresh() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,6 +90,7 @@ class MainActivity : AppCompatActivity() {
         btnNotif = findViewById(R.id.btnNotif)
         btnBattery = findViewById(R.id.btnBattery)
         btnGps = findViewById(R.id.btnGps)
+        btnAdmin = findViewById(R.id.btnAdmin)
 
         btnLogin.setOnClickListener { doLogin() }
         btnLocation.setOnClickListener {
@@ -95,9 +100,9 @@ class MainActivity : AppCompatActivity() {
         }
         btnBackground.setOnClickListener {
             if (!Perms.hasFine(this)) {
-                toast("Pehle upar wali Location permission dein")
+                toast("First allow the Location permission above")
             } else if (Build.VERSION.SDK_INT >= 29) {
-                toast("Agli screen par \"Allow all the time\" chunein")
+                toast("On the next screen choose \"Allow all the time\"")
                 bgLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
             }
         }
@@ -106,12 +111,14 @@ class MainActivity : AppCompatActivity() {
         }
         btnBattery.setOnClickListener { askBattery() }
         btnGps.setOnClickListener { askGps() }
+        btnAdmin.setOnClickListener { enableProtection() }
 
         render()
     }
 
     override fun onResume() {
         super.onResume()
+        Admin.enforceLock(this)
         render()
     }
 
@@ -130,25 +137,58 @@ class MainActivity : AppCompatActivity() {
         setRow(btnBackground, Perms.hasBackground(this), "Location: Allow all the time")
         setRow(btnNotif, Perms.hasNotif(this), "Notification permission")
         setRow(btnBattery, Perms.ignoringBattery(this), "Battery: No restriction")
-        setRow(btnGps, Perms.gpsEnabled(this), "Phone ki Location (GPS) ON")
+        setRow(btnGps, Perms.gpsEnabled(this), "Phone Location (GPS) ON")
+        renderAdminRow()
 
         if (Perms.allOk(this)) {
-            tvStatus.text = "✅ Tracking chalu hai"
+            tvStatus.text = "✅ Tracking is ON"
             tvStatus.setTextColor(getColor(R.color.ok))
             Tracker.start(this)
         } else {
-            tvStatus.text = "⚠️ Neeche ki laal settings theek karein"
+            tvStatus.text = "⚠️ Fix the red settings below"
             tvStatus.setTextColor(getColor(R.color.bad))
             if (Perms.hasFine(this)) Tracker.start(this)
         }
 
         val last = Prefs.lastFix(this)
-        tvLast.text = if (last == 0L) "Abhi tak location nahi mili"
+        tvLast.text = if (last == 0L) "No location yet"
         else "Last location: " + DateUtils.getRelativeTimeSpanString(last)
     }
 
+    private fun renderAdminRow() {
+        when (Admin.level(this)) {
+            "owner" -> {
+                btnAdmin.text = "✓  Protected — app cannot be removed"
+                btnAdmin.isEnabled = false
+                btnAdmin.setBackgroundColor(getColor(R.color.okBg))
+                btnAdmin.setTextColor(getColor(R.color.ok))
+            }
+            "admin" -> {
+                btnAdmin.text = "✓  Uninstall protection ON"
+                btnAdmin.isEnabled = false
+                btnAdmin.setBackgroundColor(getColor(R.color.okBg))
+                btnAdmin.setTextColor(getColor(R.color.ok))
+            }
+            else -> {
+                btnAdmin.text = "✗  Uninstall protection — Tap to enable"
+                btnAdmin.isEnabled = true
+                btnAdmin.setBackgroundColor(getColor(R.color.bad))
+                btnAdmin.setTextColor(getColor(android.R.color.white))
+            }
+        }
+    }
+
+    private fun enableProtection() {
+        if (Admin.level(this) != "off") return
+        try {
+            adminLauncher.launch(Admin.enableAdminIntent(this))
+        } catch (e: Exception) {
+            toast("Could not open protection settings")
+        }
+    }
+
     private fun setRow(b: Button, ok: Boolean, label: String) {
-        b.text = if (ok) "✓  $label" else "✗  $label — Tap karein"
+        b.text = if (ok) "✓  $label" else "✗  $label — Tap"
         b.isEnabled = !ok
         b.setBackgroundColor(getColor(if (ok) R.color.okBg else R.color.bad))
         b.setTextColor(getColor(if (ok) R.color.ok else android.R.color.white))
@@ -157,8 +197,8 @@ class MainActivity : AppCompatActivity() {
     private fun doLogin() {
         val mobile = etMobile.text.toString().filter { it.isDigit() }.takeLast(10)
         val pin = etPin.text.toString().trim()
-        if (mobile.length != 10) return showError("10 digit mobile number daalein")
-        if (pin.length < 4) return showError("PIN daalein (admin se lein)")
+        if (mobile.length != 10) return showError("Enter a 10-digit mobile number")
+        if (pin.length < 4) return showError("Enter the PIN (ask your admin)")
 
         setLoading(true)
         val auth = FirebaseAuth.getInstance()
@@ -179,17 +219,17 @@ class MainActivity : AppCompatActivity() {
                                 Prefs.login(this, mobile, doc.getString("name") ?: "")
                                 setLoading(false)
                                 render()
-                                toast("Login ho gaya. Ab sab settings ✓ karein.")
+                                toast("Logged in. Now turn all settings green.")
                             } else {
-                                failLogin("Ye account band hai. Admin se baat karein.")
+                                failLogin("This account is disabled. Contact your admin.")
                             }
                         }
                         .addOnFailureListener { failLogin("Error: ${it.message}") }
                 }.addOnFailureListener {
-                    failLogin("Mobile number ya PIN galat hai")
+                    failLogin("Wrong mobile number or PIN")
                 }
             }
-            .addOnFailureListener { failLogin("Internet check karein: ${it.message}") }
+            .addOnFailureListener { failLogin("Check your internet: ${it.message}") }
     }
 
     private fun failLogin(msg: String) {
@@ -216,7 +256,7 @@ class MainActivity : AppCompatActivity() {
                 Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:$packageName"))
             )
         } catch (e: Exception) {
-            openAppSettings("Battery > Unrestricted / No restrictions chunein")
+            openAppSettings("Battery > choose Unrestricted / No restrictions")
         }
     }
 

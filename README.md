@@ -30,3 +30,21 @@ Android kisi app ko zabardasti GPS ON karne ya uninstall rokne nahi deta. GPS ba
 
 ## Files
 `android/` app · `admin/` panel · `firestore.rules` · `.github/workflows/build-apk.yml`
+
+## App ko uninstall-proof banana (company phones)
+
+App me do level ka protection hai:
+
+**Level 1 — Device Admin (koi setup nahi, har phone par):** App me login ke baad "Uninstall protection" button tap karein. Ab employee seedhe uninstall nahi kar payega — pehle Settings me ye band karna padega, aur jaise hi wo koshish karega, Admin Panel me us employee par 🚨 alert aa jayega.
+
+**Level 2 — Device Owner (app bilkul uninstall nahi hoti):** Sirf company phone par, ek baar ka setup:
+1. Phone ko factory reset karein (ya naya phone lein). Setup me koi Google account add na karein.
+2. Phone par Developer Options > USB debugging ON karein.
+3. App install karein (APK link se).
+4. Phone ko computer se USB se jodein aur ye command chalayein:
+   ```
+   adb shell dpm set-device-owner com.fieldtrack.app/.AdminReceiver
+   ```
+5. Ho gaya. Ab app ka uninstall button hi kaam nahi karega, aur factory reset bhi block ho jayega.
+
+Admin Panel me har employee ke neeche dikhta hai: 🔒 Protected (locked), 🛡️ Protection ON, ya ⚠️ Protection OFF.

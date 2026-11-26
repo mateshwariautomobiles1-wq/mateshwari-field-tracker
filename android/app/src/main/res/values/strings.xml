@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Field Tracker</string>
-    <string name="info">Ye app duty ke dauraan aapki location office ke admin ko bhejta hai. Notification bar me "Duty tracking chalu hai" hamesha dikhega. Xiaomi/Redmi, Vivo, Oppo, Realme phone me Settings &gt; Apps &gt; Field Tracker &gt; Autostart ON aur Battery &gt; No restrictions zaroor karein.</string>
+    <string name="info">This app shares your location with the office admin during duty hours. A "Duty tracking is ON" notification stays in the status bar. On Xiaomi/Redmi, Vivo, Oppo and Realme phones, turn ON Settings &gt; Apps &gt; Field Tracker &gt; Autostart and set Battery &gt; No restrictions.</string>
 </resources>

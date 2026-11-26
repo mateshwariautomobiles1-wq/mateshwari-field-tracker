@@ -130,6 +130,7 @@ class LocationService : Service() {
             return START_NOT_STICKY
         }
 
+        Admin.enforceLock(this)
         startUpdates()
         watchEmployee()
         onGpsChanged(force = true)
@@ -216,7 +217,8 @@ class LocationService : Service() {
             "seenAt" to Timestamp.now(),
             "updatedAt" to FieldValue.serverTimestamp(),
             "device" to "${Build.MANUFACTURER} ${Build.MODEL}",
-            "appVersion" to BuildConfig.VERSION_NAME
+            "appVersion" to BuildConfig.VERSION_NAME,
+            "protection" to Admin.level(this)
         )
         data.putAll(extra)
         db.collection("live").document(m).set(data, SetOptions.merge())
@@ -265,10 +267,10 @@ class LocationService : Service() {
     private fun buildNotification(gpsOn: Boolean): Notification =
         NotificationCompat.Builder(this, CHANNEL_TRACK)
             .setSmallIcon(R.drawable.ic_stat_location)
-            .setContentTitle(if (gpsOn) "Duty tracking chalu hai" else "Location band hai!")
+            .setContentTitle(if (gpsOn) "Duty tracking is ON" else "Location is OFF!")
             .setContentText(
-                if (gpsOn) "Aapki location office ko share ho rahi hai"
-                else "Kripya phone ki Location (GPS) ON karein"
+                if (gpsOn) "Your location is being shared with the office"
+                else "Please turn ON phone Location (GPS)"
             )
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -283,8 +285,8 @@ class LocationService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL_ALERT)
             .setSmallIcon(R.drawable.ic_stat_location)
-            .setContentTitle("Location OFF hai")
-            .setContentText("Tap karke Location ON karein. Office ko alert ja chuka hai.")
+            .setContentTitle("Location is OFF")
+            .setContentText("Tap to turn Location ON. The office has been alerted.")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true)
             .setContentIntent(pi)

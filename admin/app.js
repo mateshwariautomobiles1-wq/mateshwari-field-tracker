@@ -28,8 +28,8 @@ const STATUS = {
   online:   { label: "Online",          color: "#16a34a", rank: 0 },
   gpsoff:   { label: "GPS OFF",         color: "#ea580c", rank: 1 },
   offline:  { label: "Offline",         color: "#9ca3af", rank: 2 },
-  never:    { label: "App login nahi",  color: "#cbd5e1", rank: 3 },
-  inactive: { label: "Band",            color: "#475569", rank: 4 },
+  never:    { label: "Not logged in",  color: "#cbd5e1", rank: 3 },
+  inactive: { label: "Disabled",            color: "#475569", rank: 4 },
 };
 
 // ---------- helpers ----------
@@ -39,16 +39,16 @@ const toDate = (ts) => (ts && typeof ts.toDate === "function" ? ts.toDate() : nu
 const pad = (n) => String(n).padStart(2, "0");
 const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
 const fmtTime = (d) => d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" });
-const fmtDur = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} ghanta${m % 60 ? ` ${m % 60} min` : ""}`; };
+const fmtDur = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h${m % 60 ? ` ${m % 60}m` : ""}`; };
 const initials = (name) => (name || "?").trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 const randomPin = () => String(Math.floor(1000 + Math.random() * 9000));
 
 function timeAgo(d) {
   if (!d) return "—";
   const s = (Date.now() - d.getTime()) / 1000;
-  if (s < 60) return "abhi";
-  if (s < 3600) return `${Math.floor(s / 60)} min pehle`;
-  if (s < 86400) return `${Math.floor(s / 3600)} ghante pehle`;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} hr ago`;
   return d.toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 }
 
@@ -91,7 +91,7 @@ $("loginForm").addEventListener("submit", async (e) => {
   } catch (err) {
     $("loginErr").textContent =
       err.code === "auth/invalid-credential" || err.code === "auth/wrong-password"
-        ? "Email ya password galat hai"
+        ? "Wrong email or password"
         : err.message;
   }
 });
@@ -102,7 +102,7 @@ function onDbError(err) {
   if (err.code === "permission-denied") {
     signOut(auth);
     $("loginErr").textContent =
-      "Is email ko admin access nahi hai. firestore.rules me apna admin email daal kar Publish karein.";
+      "This email has no admin access. Add it in firestore.rules and Publish.";
   }
 }
 
@@ -125,9 +125,33 @@ function stopListeners() { unsubs.forEach((u) => u()); unsubs = []; employees.cl
 function initMap() {
   if (map) { setTimeout(() => map.invalidateSize(), 50); return; }
   map = L.map("map", { zoomControl: true }).setView([22.6, 79.0], 5);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+
+  const street = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19, attribution: "&copy; OpenStreetMap",
-  }).addTo(map);
+  });
+  const satellite = L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 19, attribution: "Imagery &copy; Esri" }
+  );
+  const googleStreets = L.tileLayer("https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", {
+    maxZoom: 20, subdomains: ["0", "1", "2", "3"], attribution: "&copy; Google",
+  });
+  const googleSatellite = L.tileLayer("https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}", {
+    maxZoom: 20, subdomains: ["0", "1", "2", "3"], attribution: "&copy; Google",
+  });
+
+  satellite.addTo(map); // default: satellite view
+  L.control.layers(
+    {
+      "Satellite": satellite,
+      "Google Satellite": googleSatellite,
+      "Google Map": googleStreets,
+      "Street": street,
+    },
+    null,
+    { position: "topright", collapsed: false }
+  ).addTo(map);
+
   historyLayer = L.layerGroup().addTo(map);
   liveLayer = L.layerGroup().addTo(map);
   map.on("popupopen", (e) => {
@@ -162,8 +186,8 @@ function renderMarkers() {
       <span class="small">📍 Location: ${timeAgo(t)}${t ? ` (${fmtTime(t)})` : ""}</span><br>
       <span class="small">📶 Last contact: ${timeAgo(seen)}</span><br>
       <span class="small">🔋 ${l.battery ?? "?"}%${l.charging ? " 🔌" : ""} · ±${Math.round(l.acc || 0)}m</span><br>
-      <a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener">Google Maps me kholein</a>
-      ${selected ? "" : `<br><button class="btn small" style="margin-top:6px" data-open="${esc(id)}">Aaj ka route dekhein</button>`}
+      <a href="https://www.google.com/maps?q=${l.lat},${l.lng}" target="_blank" rel="noopener">Open in Google Maps</a>
+      ${selected ? "" : `<br><button class="btn small" style="margin-top:6px" data-open="${esc(id)}">View today's route</button>`}
     `);
     liveLayer.addLayer(m);
     pts.push([l.lat, l.lng]);
@@ -195,17 +219,18 @@ function renderList() {
 
   const ul = $("empList");
   if (!employees.size) {
-    ul.innerHTML = `<li class="empty">Abhi koi employee nahi hai.<br>Upar <b>+ Employee</b> dabaa kar banayein.</li>`;
+    ul.innerHTML = `<li class="empty">No employees yet.<br>Tap <b>+ Employee</b> above to add one.</li>`;
     return;
   }
   ul.innerHTML = arr.map(({ e, st }) => {
     const l = live.get(e.id);
+    const warn = l && toDate(l.removalAttemptAt) ? " 🚨" : "";
     const sub = l ? `${timeAgo(toDate(l.seenAt))} · 🔋${l.battery ?? "?"}%` : esc(e.id);
     return `<li class="emp ${e.active ? "" : "inactive"}" data-id="${esc(e.id)}">
       <div class="avatar" style="background:${STATUS[st].color}">${esc(initials(e.name))}</div>
-      <div><div class="emp-name">${esc(e.name)}</div><div class="emp-sub">${esc(e.id)} · ${sub}</div></div>
+      <div><div class="emp-name">${esc(e.name)}${warn}</div><div class="emp-sub">${esc(e.id)} · ${sub}</div></div>
       <span class="badge s-${st}">${STATUS[st].label}</span></li>`;
-  }).join("") || `<li class="empty">Koi match nahi mila</li>`;
+  }).join("") || `<li class="empty">No match found</li>`;
 }
 
 $("empList").addEventListener("click", (e) => {
@@ -238,6 +263,20 @@ $("backBtn").onclick = () => {
   renderAll();
 };
 
+// App removal protection on the phone
+function protectionHtml(l) {
+  if (!l || !l.protection) return "";
+  if (l.protection === "owner") return `🔒 <span style="color:var(--ok)">Protected — app can't be removed</span>`;
+  if (l.protection === "admin") return `🛡️ <span style="color:var(--ok)">Uninstall protection ON</span>`;
+  return `⚠️ <span style="color:var(--warn)">Uninstall protection OFF</span>`;
+}
+// Did the employee try to remove the app?
+function removalAlert(l) {
+  const d = l && toDate(l.removalAttemptAt);
+  if (!d) return "";
+  return `🚨 <b style="color:var(--bad)">App removal attempt</b> — ${timeAgo(d)}`;
+}
+
 function renderDetail() {
   const emp = employees.get(selected);
   if (!emp) { $("backBtn").onclick(); return; }
@@ -246,18 +285,20 @@ function renderDetail() {
   $("dMobile").textContent = `📱 ${emp.id} · PIN ${emp.pin}`;
   $("dBadge").className = `badge s-${st}`;
   $("dBadge").textContent = STATUS[st].label;
+  const alert = removalAlert(l);
   $("dLive").innerHTML = l
-    ? `Last contact: <b>${timeAgo(toDate(l.seenAt))}</b> · 🔋 ${l.battery ?? "?"}%${l.charging ? " 🔌" : ""}<br>
+    ? `${alert ? alert + "<br>" : ""}Last contact: <b>${timeAgo(toDate(l.seenAt))}</b> · 🔋 ${l.battery ?? "?"}%${l.charging ? " 🔌" : ""}<br>
+       ${protectionHtml(l)}${protectionHtml(l) ? "<br>" : ""}
        <span class="muted">${esc(l.device || "")} · App v${esc(l.appVersion || "?")}</span>`
-    : `<span class="muted">Employee ne abhi tak app me login nahi kiya.</span>`;
-  $("toggleBtn").textContent = emp.active ? "⏸️ Band karein" : "▶️ Chalu karein";
+    : `<span class="muted">Employee has not logged in to the app yet.</span>`;
+  $("toggleBtn").textContent = emp.active ? "⏸️ Disable" : "▶️ Enable";
 }
 
 $("dDate").addEventListener("change", () => loadDay(true));
 $("liveBtn").onclick = () => {
   const l = live.get(selected);
   if (l && typeof l.lat === "number") map.setView([l.lat, l.lng], 16);
-  else alertModal("Is employee ki live location abhi available nahi hai.");
+  else alertModal("This employee's live location is not available yet.");
 };
 
 async function loadDay(fit = true) {
@@ -265,7 +306,7 @@ async function loadDay(fit = true) {
   if (!id) return;
   const [y, m, d] = $("dDate").value.split("-").map(Number);
   const start = new Date(y, m - 1, d), end = new Date(y, m - 1, d + 1);
-  $("dayStats").innerHTML = `<div class="stat" style="grid-column:1/-1"><span>Load ho raha hai…</span></div>`;
+  $("dayStats").innerHTML = `<div class="stat" style="grid-column:1/-1"><span>Loading…</span></div>`;
   $("timeline").innerHTML = "";
 
   let snap;
@@ -307,7 +348,7 @@ function drawDay(fit = true) {
   const pts = dayPoints;
   const emp = employees.get(selected);
   if (!pts.length) {
-    $("dayStats").innerHTML = `<div class="stat" style="grid-column:1/-1"><span>Is din ki koi location record nahi hai</span></div>`;
+    $("dayStats").innerHTML = `<div class="stat" style="grid-column:1/-1"><span>No location records for this day</span></div>`;
     $("timeline").innerHTML = "";
     const l = live.get(selected);
     if (fit && l && typeof l.lat === "number") map.setView([l.lat, l.lng], 14);
@@ -329,26 +370,26 @@ function drawDay(fit = true) {
   const line = L.polyline(pts.map((p) => [p.lat, p.lng]), { color: "#1e5eff", weight: 4, opacity: 0.8 }).addTo(historyLayer);
   pts.forEach((p) => L.circleMarker([p.lat, p.lng], { radius: 3, color: "#1e5eff", weight: 1, fillOpacity: 0.9 })
     .bindTooltip(`${fmtTime(p.t)} · 🔋${p.battery ?? "?"}%`).addTo(historyLayer));
-  L.marker([first.lat, first.lng], { icon: dotIcon("#16a34a") }).bindTooltip(`Shuru: ${fmtTime(first.t)}`).addTo(historyLayer);
-  L.marker([last.lat, last.lng], { icon: dotIcon("#dc2626") }).bindTooltip(`Aakhri: ${fmtTime(last.t)}`).addTo(historyLayer);
+  L.marker([first.lat, first.lng], { icon: dotIcon("#16a34a") }).bindTooltip(`Start: ${fmtTime(first.t)}`).addTo(historyLayer);
+  L.marker([last.lat, last.lng], { icon: dotIcon("#dc2626") }).bindTooltip(`End: ${fmtTime(last.t)}`).addTo(historyLayer);
   stops.forEach((s, n) => L.marker([s.lat, s.lng], {
     icon: L.divIcon({ className: "", html: `<div class="stopdot">${n + 1}</div>`, iconSize: [22, 22], iconAnchor: [11, 11] }),
-  }).bindPopup(`<b>Stop ${n + 1}</b><br>${fmtTime(s.from)} – ${fmtTime(s.to)}<br>Ruka: ${fmtDur(s.to - s.from)}`).addTo(historyLayer));
+  }).bindPopup(`<b>Stop ${n + 1}</b><br>${fmtTime(s.from)} – ${fmtTime(s.to)}<br>Stopped: ${fmtDur(s.to - s.from)}`).addTo(historyLayer));
   if (fit) map.fitBounds(line.getBounds(), { padding: [40, 40], maxZoom: 16 });
 
   const stat = (v, l) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`;
   $("dayStats").innerHTML =
-    stat(`${(dist / 1000).toFixed(1)} km`, "Kul doori") +
+    stat(`${(dist / 1000).toFixed(1)} km`, "Distance") +
     stat(stops.length, "Stops (10+ min)") +
     stat(`${Math.floor((last.t - first.t) / 3600000)}h ${Math.round(((last.t - first.t) % 3600000) / 60000)}m`, "Duty time") +
-    stat(fmtTime(first.t), "Pehli location") +
-    stat(fmtTime(last.t), "Aakhri location") +
+    stat(fmtTime(first.t), "First location") +
+    stat(fmtTime(last.t), "Last location") +
     stat(pts.length, "Points");
 
   const items = [
-    { cls: "start", p: first, text: `🟢 ${fmtTime(first.t)} — Din ki shuruaat` },
+    { cls: "start", p: first, text: `🟢 ${fmtTime(first.t)} — Day start` },
     ...stops.map((s, n) => ({ cls: "stop", p: s, text: `🟠 Stop ${n + 1}: ${fmtTime(s.from)} – ${fmtTime(s.to)} (${fmtDur(s.to - s.from)})` })),
-    { cls: "end", p: last, text: `🔴 ${fmtTime(last.t)} — Aakhri location` },
+    { cls: "end", p: last, text: `🔴 ${fmtTime(last.t)} — Last location` },
   ];
   $("timeline").innerHTML = items.map((it, k) =>
     `<li class="${it.cls}" data-k="${k}">${it.text}<div class="addr"></div></li>`).join("");
@@ -357,7 +398,7 @@ function drawDay(fit = true) {
       const p = items[+li.dataset.k].p;
       map.setView([p.lat, p.lng], 17);
       const box = li.querySelector(".addr");
-      box.textContent = "Address dhoondh rahe hain…";
+      box.textContent = "Finding address…";
       box.textContent = await reverseGeocode(p.lat, p.lng);
     };
   });
@@ -391,9 +432,9 @@ function downloadCsv(emp, pts) {
 function openModal(html) { $("modalBody").innerHTML = html; $("modal").classList.remove("hidden"); }
 function closeModal() { $("modal").classList.add("hidden"); $("modalBody").innerHTML = ""; }
 $("modal").addEventListener("click", (e) => { if (e.target.id === "modal" || e.target.dataset.close !== undefined) closeModal(); });
-function alertModal(msg) { openModal(`<p>${esc(msg)}</p><button class="btn primary" data-close>Theek hai</button>`); }
+function alertModal(msg) { openModal(`<p>${esc(msg)}</p><button class="btn primary" data-close>OK</button>`); }
 
-function confirmModal(msg, okText = "Haan") {
+function confirmModal(msg, okText = "Yes") {
   return new Promise((resolve) => {
     openModal(`<p>${msg}</p><div class="btn-row"><button class="btn danger" id="cOk">${esc(okText)}</button>
       <button class="btn" id="cNo">Cancel</button></div>`);
@@ -403,18 +444,18 @@ function confirmModal(msg, okText = "Haan") {
 }
 
 function shareText(emp) {
-  return `Namaste ${emp.name},\n\nField Tracker app install karein:\n${APK_URL}\n\nLogin:\nMobile: ${emp.id}\nPIN: ${emp.pin}\n\n` +
-    `Login ke baad app me saari settings ✓ karein (Location: "Allow all the time", Battery: No restrictions).`;
+  return `Hello ${emp.name},\n\nInstall the Field Tracker app:\n${APK_URL}\n\nLogin:\nMobile: ${emp.id}\nPIN: ${emp.pin}\n\n` +
+    `After login, turn on all settings (Location: "Allow all the time", Battery: No restrictions).`;
 }
 
-function showCredentials(emp, title = "Employee ban gaya ✅") {
+function showCredentials(emp, title = "Employee created ✅") {
   openModal(`
     <h3>${esc(title)}</h3>
     <div class="cred">👤 <b>${esc(emp.name)}</b><br>📱 Mobile: <b>${esc(emp.id)}</b><br>🔑 PIN: <b>${esc(emp.pin)}</b></div>
-    <p class="small muted">Ye details aur APK link employee ko bhejein.</p>
+    <p class="small muted">Send these details and the APK link to the employee.</p>
     <div class="btn-row">
       <a class="btn primary" target="_blank" rel="noopener"
-         href="https://wa.me/91${esc(emp.id)}?text=${encodeURIComponent(shareText(emp))}">WhatsApp par bhejein</a>
+         href="https://wa.me/91${esc(emp.id)}?text=${encodeURIComponent(shareText(emp))}">Send on WhatsApp</a>
       <button class="btn" id="copyBtn">Copy</button>
       <button class="btn ghost" data-close>Band karein</button>
     </div>`);
@@ -426,9 +467,9 @@ function showCredentials(emp, title = "Employee ban gaya ✅") {
 // ---------- create employee ----------
 $("addBtn").onclick = () => {
   openModal(`
-    <h3>Naya employee</h3>
+    <h3>New employee</h3>
     <form id="addForm" style="display:grid;gap:12px">
-      <label>Naam<input id="fName" required maxlength="60" placeholder="Jaise: Ramesh Kumar"></label>
+      <label>Name<input id="fName" required maxlength="60" placeholder="e.g. Ramesh Kumar"></label>
       <label>Mobile number<input id="fMobile" required inputmode="numeric" maxlength="13" placeholder="10 digit"></label>
       <label>PIN (app login ke liye)<input id="fPin" required inputmode="numeric" maxlength="8" value="${randomPin()}"></label>
       <p id="fErr" class="err"></p>
@@ -441,14 +482,14 @@ $("addBtn").onclick = () => {
     const name = $("fName").value.trim();
     const mobile = $("fMobile").value.replace(/\D/g, "").slice(-10);
     const pin = $("fPin").value.trim();
-    if (!name) return ($("fErr").textContent = "Naam daalein");
-    if (!/^\d{10}$/.test(mobile)) return ($("fErr").textContent = "Sahi 10 digit mobile number daalein");
-    if (!/^\d{4,8}$/.test(pin)) return ($("fErr").textContent = "PIN 4 se 8 digit ka number ho");
+    if (!name) return ($("fErr").textContent = "Enter a name");
+    if (!/^\d{10}$/.test(mobile)) return ($("fErr").textContent = "Enter a valid 10-digit mobile number");
+    if (!/^\d{4,8}$/.test(pin)) return ($("fErr").textContent = "PIN must be 4 to 8 digits");
     $("fSave").disabled = true;
     try {
       if ((await getDoc(doc(db, "employees", mobile))).exists()) {
         $("fSave").disabled = false;
-        return ($("fErr").textContent = "Is mobile number ka employee pehle se hai");
+        return ($("fErr").textContent = "An employee with this mobile already exists");
       }
       const b = writeBatch(db);
       b.set(doc(db, "employees", mobile), { name, mobile, pin, active: true, createdAt: serverTimestamp() });
@@ -467,7 +508,7 @@ $("shareBtn").onclick = () => showCredentials(employees.get(selected), "Login de
 
 $("editBtn").onclick = () => {
   const emp = employees.get(selected);
-  openModal(`<h3>Naam badlein</h3><input id="eName" maxlength="60" value="${esc(emp.name)}">
+  openModal(`<h3>Change name</h3><input id="eName" maxlength="60" value="${esc(emp.name)}">
     <div class="btn-row"><button class="btn primary" id="eSave">Save</button><button class="btn" data-close>Cancel</button></div>`);
   $("eSave").onclick = async () => {
     const name = $("eName").value.trim();
@@ -479,8 +520,8 @@ $("editBtn").onclick = () => {
 
 $("pinBtn").onclick = () => {
   const emp = employees.get(selected);
-  openModal(`<h3>Naya PIN</h3>
-    <p class="small muted">Jo phone pehle se login hai wo chalta rahega. Naya PIN sirf naye login ke liye hai.</p>
+  openModal(`<h3>New PIN</h3>
+    <p class="small muted">Phones already logged in keep working. The new PIN is only for new logins.</p>
     <input id="pNew" inputmode="numeric" maxlength="8" value="${randomPin()}">
     <div class="btn-row"><button class="btn primary" id="pSave">Save</button><button class="btn" data-close>Cancel</button></div>`);
   $("pSave").onclick = async () => {
@@ -491,14 +532,14 @@ $("pinBtn").onclick = () => {
     if (emp.active) b.set(doc(db, "logins", `${emp.id}_${pin}`), { mobile: emp.id, createdAt: serverTimestamp() });
     b.update(doc(db, "employees", emp.id), { pin });
     await b.commit();
-    showCredentials({ ...emp, pin }, "PIN badal gaya ✅");
+    showCredentials({ ...emp, pin }, "PIN changed ✅");
   };
 };
 
 $("toggleBtn").onclick = async () => {
   const emp = employees.get(selected);
   if (emp.active) {
-    const ok = await confirmModal(`<b>${esc(emp.name)}</b> ki tracking band karein? Phone se app logout ho jayega aur login nahi ho payega.`, "Band karein");
+    const ok = await confirmModal(`<b>${esc(emp.name)}</b> — stop tracking? The app will log out on their phone and cannot log in again.`, "Disable");
     if (!ok) return;
     const b = writeBatch(db);
     b.update(doc(db, "employees", emp.id), { active: false });
@@ -509,15 +550,15 @@ $("toggleBtn").onclick = async () => {
     b.update(doc(db, "employees", emp.id), { active: true });
     b.set(doc(db, "logins", `${emp.id}_${emp.pin}`), { mobile: emp.id, createdAt: serverTimestamp() });
     await b.commit();
-    showCredentials(emp, "Account chalu ✅ — employee ko dobara login karna hoga");
+    showCredentials(emp, "Account enabled ✅ — the employee must log in again");
   }
 };
 
 $("delBtn").onclick = async () => {
   const emp = employees.get(selected);
-  const ok = await confirmModal(`<b>${esc(emp.name)}</b> (${esc(emp.id)}) ko <b>hamesha ke liye delete</b> karein? Saari location history bhi mit jayegi.`, "Delete");
+  const ok = await confirmModal(`<b>${esc(emp.name)}</b> (${esc(emp.id)}) — <b>permanently delete</b>? All location history will be erased too.`, "Delete");
   if (!ok) return;
-  openModal(`<p>Delete ho raha hai… kripya ruke</p>`);
+  openModal(`<p>Deleting… please wait</p>`);
   try {
     const b = writeBatch(db);
     b.delete(doc(db, "employees", emp.id));
@@ -540,7 +581,7 @@ $("delBtn").onclick = async () => {
   }
 };
 
-// har 30 sec "x min pehle" aur status refresh; aaj ka route har 2 min reload
+// refresh "x min ago" + status every 30s; reload today's route every 2 min
 let tick = 0;
 setInterval(() => {
   if (!auth.currentUser) return;
